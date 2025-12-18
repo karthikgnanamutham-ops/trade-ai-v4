@@ -13,11 +13,11 @@ MAX_WORKERS = 16
 PRICE_MIN = 1
 PRICE_MAX = 5000
 
-VOLUME_LOOKBACK = 6          # any spike in last 6 candles
+VOLUME_LOOKBACK = 6
 RSI_SLOPE_LOOKBACK = 3
 RANGE_LOOKBACK = 20
 
-TOP_N = 5                   # top volume per RSI zone
+TOP_N = 5
 # =========================================
 
 load_dotenv()
@@ -86,8 +86,9 @@ def send_telegram(msg):
     requests.post(url, json=payload, timeout=10)
 
 # ================= CORE =================
-def process_stock(row, symbol_col, secid_col):
+def process_stock(row, symbol_col, name_col, secid_col):
     symbol = str(row[symbol_col])
+    company = str(row[name_col])
     security_id = row[secid_col]
 
     df = get_ohlc(security_id, INTERVAL)
@@ -117,6 +118,7 @@ def process_stock(row, symbol_col, secid_col):
 
     return {
         "symbol": symbol,
+        "company": company.upper(),
         "price": price,
         "rsi": rsi,
         "slope": slope_icon,
@@ -128,14 +130,20 @@ def process_stock(row, symbol_col, secid_col):
 # ================= MAIN =================
 def main():
     stocks = pd.read_csv("stocks.csv")
+
+    # Auto-detect columns
     symbol_col = next(c for c in stocks.columns if "symbol" in c.lower())
     secid_col = next(c for c in stocks.columns if "security" in c.lower())
+    name_col = next(
+        c for c in stocks.columns
+        if any(k in c.lower() for k in ["company", "name"])
+    )
 
     results = []
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [
-            executor.submit(process_stock, row, symbol_col, secid_col)
+            executor.submit(process_stock, row, symbol_col, name_col, secid_col)
             for _, row in stocks.iterrows()
         ]
         for f in as_completed(futures):
@@ -159,7 +167,7 @@ def main():
         msg += "\n<b>🟢 BUY / WATCH (Reversal)</b>\n"
         for _, r in buys.sort_values("volume", ascending=False).iterrows():
             msg += (
-                f"\n<b>{r.symbol}</b>\n"
+                f"\n<b>{r.company}</b>\n"
                 f"{r.price} | {r.rsi} | {int(r.volume/1000)}K\n"
                 f"{r.context}\n"
             )
@@ -169,7 +177,7 @@ def main():
         msg += "\n<b>🔴 SELL / EXIT (Exhaustion)</b>\n"
         for _, r in sells.sort_values("volume", ascending=False).iterrows():
             msg += (
-                f"\n<b>{r.symbol}</b>\n"
+                f"\n<b>{r.company}</b>\n"
                 f"{r.price} | {r.rsi} | {int(r.volume/1000)}K\n"
                 f"{r.context}\n"
             )
@@ -194,7 +202,7 @@ def main():
 
         for _, r in top.iterrows():
             msg += (
-                f"\n<b>{r.symbol}</b>\n"
+                f"\n<b>{r.company}</b>\n"
                 f"{r.price} | {r.rsi} | {int(r.volume/1000)}K\n"
             )
 
