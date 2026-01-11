@@ -13,8 +13,8 @@ INTERVAL = 5
 MAX_WORKERS = 16
 
 # 🔧 PRICE FILTER (KEEP WIDE – PhysicsWallah ~130)
-PRICE_MIN = 1
-PRICE_MAX = 5000
+PRICE_MIN = 100
+PRICE_MAX = 2000
 
 TOP_PER_BUCKET = 10
 # =========================================
